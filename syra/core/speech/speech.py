@@ -2,7 +2,7 @@ from syra.config import load_config
 from syra.core.speech.stt_engines import get_stt_engine
 from syra.core.speech.tts_engines import get_tts_engine
 from syra.core.reasoning.reasoning import analyze
-from syra.core.memory.memory import save_interaction
+from syra.core.memory.knowledge_store import update_fact
 import time
 
 config = load_config()
@@ -11,6 +11,7 @@ tts = get_tts_engine(config)
 
 def speech_loop():
     print("[SPEECH] SYRA is listening...")
+
     try:
         while True:
             user_input = stt.listen()
@@ -21,19 +22,25 @@ def speech_loop():
                 continue
 
             print(f"[SPEECH] Heard: {user_input}")
-            response = analyze(user_input)
 
-            if response:
-                print(f"[SPEECH] Responding: {response}")
-                tts.speak(response)
-                save_interaction(user_input, response)
+            # Special pattern: teaching SYRA a fact
+            if user_input.lower().startswith("remember that"):
+                try:
+                    _, statement = user_input.split("that", 1)
+                    topic, value = statement.strip().split("is", 1)
+                    update_fact(topic.strip(), value.strip())
+                    response = f"Okay, I'll remember that {topic.strip()} is {value.strip()}."
+                except Exception as e:
+                    response = "I heard you wanted me to remember something, but I couldn't understand the format."
             else:
-                print("[SPEECH] No response generated.")
+                response = analyze(user_input)
 
-            # Add delay to simulate natural pacing
+            print(f"[SPEECH] Responding: {response}")
+            tts.speak(response)
+
             time.sleep(0.5)
 
     except KeyboardInterrupt:
-        print("\n[SPEECH] User interrupted the loop.")
+        print("\n[SPEECH] Loop interrupted by user.")
     except Exception as e:
         print(f"[SPEECH ERROR] {e}")
