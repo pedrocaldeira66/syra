@@ -1,27 +1,51 @@
-import serial
-import pynmea2
+# syra/core/hardware/gps_interface.py
+
+import logging
 import time
 
-class GPSInterface:
-    def __init__(self, port="/dev/serial0", baudrate=9600, timeout=1):
-        self.ser = serial.Serial(port, baudrate=baudrate, timeout=timeout)
-        time.sleep(2)  # Wait for GPS module to stabilize
+from syra.config import config
+from syra.utils.safe_init import safe_import
 
-    def read_sentence(self):
-        try:
-            line = self.ser.readline().decode("ascii", errors="replace")
-            if line.startswith("$"):
-                return pynmea2.parse(line)
-        except (pynmea2.ParseError, UnicodeDecodeError):
-            return None
+logger = logging.getLogger(__name__)
 
-    def get_location(self):
-        while True:
-            msg = self.read_sentence()
-            if msg and isinstance(msg, pynmea2.types.talker.GGA):
-                return {
-                    "lat": msg.latitude,
-                    "lon": msg.longitude,
-                    "alt": msg.altitude,
-                    "timestamp": msg.timestamp
-                }
+USE_MOCK = config.get("USE_MOCK", "false").lower() == "true"
+GPS_DRIVER = config.get("GPS_DRIVER", "mock")
+
+if USE_MOCK or GPS_DRIVER == "mock":
+    class GPS:
+        def __init__(self):
+            logger.debug("[GPS] Using mock GPS module")
+
+        def get_location(self):
+            logger.debug("[GPS] Returning mock GPS data")
+            return {"lat": 38.8, "lon": -9.1, "alt": 12.5}
+
+else:
+    serial = safe_import("serial")
+    pynmea2 = safe_import("pynmea2")
+
+    class GPS:
+        def __init__(self):
+            logger.info("[GPS] Initializing real GPS module")
+            port = config.get("GPS_SERIAL_PORT", "/dev/ttyAMA0")
+            baudrate = int(config.get("GPS_BAUDRATE", "9600"))
+            self.ser = serial.Serial(port, baudrate, timeout=1)
+            logger.debug(f"[GPS] Serial port {port} opened at {baudrate} bps")
+
+        def get_location(self):
+            try:
+                while True:
+                    line = self.ser.readline().decode("utf-8", errors="ignore")
+                    if line.startswith("$GPGGA"):
+                        msg = pynmea2.parse(line)
+                        return {
+                            "lat": msg.latitude,
+                            "lon": msg.longitude,
+                            "alt": msg.altitude,
+                        }
+            except Exception as e:
+                logger.error(f"[GPS] Error parsing GPS data: {e}")
+                return None
+
+def initialize(config):
+    logger.info("[INIT] GPS interface initialized.")

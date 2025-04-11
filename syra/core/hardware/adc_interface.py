@@ -1,29 +1,44 @@
+# syra/core/hardware/adc_interface.py
+
 import os
-from dotenv import load_dotenv
+import logging
 
-load_dotenv()
+from syra.config import config
+from syra.utils.safe_init import safe_import
 
-I2C_ADDR = int(os.getenv("ADS1115_ADDR", "0x48"), 16)
-ADC_GAIN = int(os.getenv("ADC_GAIN", "1"))
+logger = logging.getLogger(__name__)
 
-class ADCInterface:
-    def __init__(self):
-        import board
-        import busio
-        from adafruit_ads1x15.ads1115 import ADS1115
-        from adafruit_ads1x15.analog_in import AnalogIn
+# Determine whether to use mock or real ADC
+USE_MOCK = config.get("USE_MOCK", "false").lower() == "true"
+ADC_DRIVER = config.get("ADC_DRIVER", "mock")
 
-        i2c = busio.I2C(board.SCL, board.SDA)
-        self.ads = ADS1115(i2c, address=I2C_ADDR)
-        self.ads.gain = ADC_GAIN
+if USE_MOCK or ADC_DRIVER == "mock":
+    class ADC:
+        def __init__(self):
+            logger.debug("[ADC] Using mock ADC interface")
 
-        # Create channels
-        self.channels = [AnalogIn(self.ads, getattr(ADS1115, f"P{i}")) for i in range(4)]
+        def read_channel(self, channel):
+            logger.debug(f"[ADC] Reading mock channel {channel}")
+            return 1234  # Simulated value
 
-    def read_all(self):
-        return [ch.voltage for ch in self.channels]
+else:
+    # Attempt to import the real ADC driver (e.g., Adafruit_ADS1x15)
+    ADS1115 = safe_import("adafruit_ads1x15.ads1115")
+    AnalogIn = safe_import("adafruit_ads1x15.analog_in")
+    import board
+    import busio
 
-    def read_channel(self, index):
-        if 0 <= index < 4:
-            return self.channels[index].voltage
-        raise IndexError("ADC channel index out of range")
+    class ADC:
+        def __init__(self):
+            logger.info("[ADC] Initializing real ADS1115")
+            self.i2c = busio.I2C(board.SCL, board.SDA)
+            self.adc = ADS1115.ADS1115(self.i2c)
+            logger.debug("[ADC] ADS1115 initialized")
+
+        def read_channel(self, channel):
+            logger.debug(f"[ADC] Reading from channel {channel}")
+            chan = AnalogIn.AnalogIn(self.adc, getattr(AnalogIn, f"P{channel}"))
+            return chan.value
+
+def initialize(config):
+    logger.info("[INIT] ADC interface initialized.")

@@ -2,7 +2,7 @@ from syra.boot import boot_sequence
 from syra.core.speech import get_stt, get_tts
 from syra.core.vision import OpenCVCamera
 from core.reasoning.reasoning import ReasoningEngine
-from syra.core.memory import MemoryStore
+from core.memory.memory import MemoryStore
 from syra.core.hardware import HardwareInterface
 from syra.utils.safe_init import safe_init
 import time
