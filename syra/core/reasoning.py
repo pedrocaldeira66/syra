@@ -1,41 +1,23 @@
-import os
-from dotenv import load_dotenv
+from syra.config import load_config
+from syra.core.llm.llm_agent import ask_llm
 
-load_dotenv()
+config = load_config()
+use_llm = config.get("llm", {}).get("use_llm", False)
 
-USE_LLM = os.getenv("USE_LLM", "false").lower() == "true"
-LLM_MODE = os.getenv("LLM_MODE", "offline")
-LLM_MODEL = os.getenv("LLM_MODEL", "gpt-4")
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
+def analyze(prompt):
+    if not use_llm:
+        print("[REASONING] LLM disabled, using default response.")
+        return "I'm not currently processing reasoning tasks."
 
-class ReasoningEngine:
-    def __init__(self):
-        self.use_llm = USE_LLM and LLM_MODE == "online" and bool(OPENAI_API_KEY)
-        if self.use_llm:
-            import openai
-            openai.api_key = OPENAI_API_KEY
-            self.client = openai
-        else:
-            self.client = None
+    print(f"[REASONING] Prompt received: {prompt}")
+    try:
+        response = ask_llm(prompt)
+        print(f"[REASONING] LLM response: {response}")
+        return response
+    except Exception as e:
+        print(f"[ERROR] Reasoning failed: {e}")
+        return "An error occurred during reasoning."
 
-    def generate_plan(self, perception, memory):
-        if self.use_llm:
-            try:
-                prompt = f"Perception: {perception}\nMemory: {memory}\nWhat should I do?"
-                response = self.client.ChatCompletion.create(
-                    model=LLM_MODEL,
-                    messages=[{"role": "user", "content": prompt}]
-                )
-                plan = response["choices"][0]["message"]["content"]
-                return {"plan": plan}
-            except Exception as e:
-                print(f"[LLM ERROR] {e}")
-                return {"plan": "error"}
-        else:
-            return {"plan": "say hi"}  # Simple placeholder logic
-
-    def select_action(self, plan):
-        return plan["plan"]
-
-def initialize(config):
-    print(f"[INIT] Reasoning engine initialized. LLM={'enabled' if USE_LLM else 'disabled'}, MODE={LLM_MODE}")
+# Optional: test run
+if __name__ == "__main__":
+    print(analyze("What is the mission objective?"))
