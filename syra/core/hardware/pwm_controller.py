@@ -1,33 +1,33 @@
-import os
-from dotenv import load_dotenv
+import logging
+from syra.config import config
+from syra.utils.safe_init import safe_import
 
-load_dotenv()
+logger = logging.getLogger(__name__)
 
-I2C_ADDR = int(os.getenv("PCA9685_ADDR", "0x40"), 16)
-PWM_FREQ = int(os.getenv("PWM_FREQ", "50"))  # Hz — typical for ESCs
+USE_MOCK = config.get("USE_MOCK", "false").lower() == "true"
+PWM_DRIVER = config.get("PWM_DRIVER", "mock")
 
-class PWMController:
-    def __init__(self):
-        import board
-        import busio
-        from adafruit_pca9685 import PCA9685
+if USE_MOCK or PWM_DRIVER == "mock":
+    class PWMController:
+        def __init__(self):
+            logger.debug("[PWM] Using mock PWM controller")
 
-        i2c = busio.I2C(board.SCL, board.SDA)
-        self.pca = PCA9685(i2c, address=I2C_ADDR)
-        self.pca.frequency = PWM_FREQ
+        def set_pwm(self, channel, duty_cycle):
+            logger.info(f"[PWM] [MOCK] Setting PWM on channel {channel} to {duty_cycle}%")
 
-        # Assume channels 0–3 for motors
-        self.motor_channels = [self.pca.channels[i] for i in range(4)]
+else:
+    Adafruit_PCA9685 = safe_import("Adafruit_PCA9685")
 
-    def set_motor_speed(self, index, duty):
-        """Set motor PWM duty cycle. Value range: 0.0 to 1.0"""
-        if 0 <= index < len(self.motor_channels):
-            pwm_val = int(duty * 0xFFFF)
-            self.motor_channels[index].duty_cycle = pwm_val
-        else:
-            raise IndexError("Invalid motor index")
+    class PWMController:
+        def __init__(self, freq=50):
+            self.pwm = Adafruit_PCA9685.PCA9685()
+            self.pwm.set_pwm_freq(freq)
+            logger.info(f"[PWM] PCA9685 initialized at {freq}Hz")
 
-    def shutdown(self):
-        for channel in self.motor_channels:
-            channel.duty_cycle = 0
-        self.pca.deinit()
+        def set_pwm(self, channel, duty_cycle):
+            pulse = int(duty_cycle / 100.0 * 4095)
+            self.pwm.set_pwm(channel, 0, pulse)
+            logger.debug(f"[PWM] Set channel {channel} to {pulse}/4095")
+
+def initialize(config):
+    logger.info("[INIT] PWM controller initialized.")
