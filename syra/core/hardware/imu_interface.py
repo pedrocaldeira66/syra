@@ -1,49 +1,60 @@
+# syra/core/hardware/imu_interface.py
+
 import time
-from syra.config import load_config
+import logging
+from syra.config import config
+from syra.utils.safe_init import safe_import
 
-try:
-    import smbus
-except ImportError:
-    smbus = None
-    print("[IMU] smbus module not available — running in mock mode.")
+logger = logging.getLogger(__name__)
 
-config = load_config()
-USE_MOCK = config.get("use_mock", False)
+USE_MOCK = config.get("USE_MOCK", "false").lower() == "true"
+IMU_DRIVER = config.get("IMU_DRIVER", "mock")
 
-class IMU:
-    def __init__(self):
-        if USE_MOCK or smbus is None:
-            self.mock = True
-            print("[IMU] Running in mock mode.")
-        else:
-            self.mock = False
-            self.bus = smbus.SMBus(1)
-            self.address = 0x68
-            self.bus.write_byte_data(self.address, 0x6B, 0)  # Wake up MPU-6050
-            print("[IMU] Initialized MPU-6050 at I2C address 0x68.")
+if USE_MOCK or IMU_DRIVER == "mock":
+    class IMU:
+        def __init__(self):
+            logger.debug("[IMU] Using mock IMU interface")
 
-    def read(self):
-        if self.mock:
+        def read(self):
+            logger.debug("[IMU] Returning mock IMU data")
             return {
-                "accel_x": 0,
-                "accel_y": 0,
-                "accel_z": 1,
-                "gyro_x": 0,
-                "gyro_y": 0,
-                "gyro_z": 0,
+                "accel_x": 0.01,
+                "accel_y": 0.01,
+                "accel_z": 0.98,
+                "gyro_x": 0.02,
+                "gyro_y": 0.01,
+                "gyro_z": -0.01,
             }
 
-        def read_word(reg):
+else:
+    smbus = safe_import("smbus")
+
+    class IMU:
+        def __init__(self):
+            self.bus = smbus.SMBus(1)
+            self.address = 0x68
+            self.bus.write_byte_data(self.address, 0x6B, 0)  # Wake up MPU6050
+            logger.info("[IMU] MPU6050 initialized at 0x68")
+
+        def _read_word(self, reg):
             high = self.bus.read_byte_data(self.address, reg)
             low = self.bus.read_byte_data(self.address, reg + 1)
-            val = (high << 8) + low
-            return val - 65536 if val >= 0x8000 else val
+            value = (high << 8) + low
+            return value - 65536 if value >= 0x8000 else value
 
-        return {
-            "accel_x": read_word(0x3B) / 16384.0,
-            "accel_y": read_word(0x3D) / 16384.0,
-            "accel_z": read_word(0x3F) / 16384.0,
-            "gyro_x": read_word(0x43) / 131.0,
-            "gyro_y": read_word(0x45) / 131.0,
-            "gyro_z": read_word(0x47) / 131.0,
-        }
+        def read(self):
+            try:
+                return {
+                    "accel_x": self._read_word(0x3B) / 16384.0,
+                    "accel_y": self._read_word(0x3D) / 16384.0,
+                    "accel_z": self._read_word(0x3F) / 16384.0,
+                    "gyro_x": self._read_word(0x43) / 131.0,
+                    "gyro_y": self._read_word(0x45) / 131.0,
+                    "gyro_z": self._read_word(0x47) / 131.0,
+                }
+            except Exception as e:
+                logger.error(f"[IMU] Read error: {e}")
+                return None
+
+def initialize(config):
+    logger.info("[INIT] IMU interface initialized.")
