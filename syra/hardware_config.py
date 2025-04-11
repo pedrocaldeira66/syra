@@ -1,12 +1,24 @@
+# syra/hardware_config.py
+
 import json
 import os
 
-def load_hardware_config(path="./.hardware_config"):
-    full_path = os.path.abspath(path)
-    if not os.path.exists(full_path):
-        print(f"[WARN] .hardware_config file not found at: {full_path}")
+CONFIG_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), ".hardware_config")
+
+def load_hardware_config():
+    if not os.path.exists(CONFIG_PATH):
+        print("[WARN] .hardware_config file not found. Using defaults.")
         return {}
 
-    print(f"[CONFIG] Loaded hardware config from: {full_path}")
-    with open(full_path, "r") as f:
-        return json.load(f)
+    try:
+        with open(CONFIG_PATH, "r") as f:
+            config = json.load(f)
+            print(f"[CONFIG] Loaded hardware config from: {CONFIG_PATH}")
+            return config
+    except json.JSONDecodeError as e:
+        print(f"[ERROR] Invalid JSON in .hardware_config: {e}")
+        return {}
+
+def get_hardware_component(name, default=None):
+    config = load_hardware_config()
+    return config.get(name, default)
