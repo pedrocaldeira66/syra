@@ -1,0 +1,9 @@
+{
+  "camera": "stereo_usb",
+  "tts": "coqui",
+  "stt": "vosk",
+  "motor_driver": "pwm_hat",
+  "battery_sensor": "INA219",
+  "speaker": "usb_audio",
+  "mic": "usb_mic"
+}
