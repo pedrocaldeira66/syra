@@ -1,5 +1,6 @@
+from core.reasoning import reasoning
 from syra.config import load_config
-from syra.core import hardware, vision, speech, reasoning, memory
+from syra.core import hardware, vision, speech, memory
 from syra.utils.safe_init import safe_init
 from syra.hardware_config import load_hardware_config
 

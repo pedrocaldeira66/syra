@@ -1,24 +1,22 @@
-from syra.utils.safe_init import safe_init
+from syra.config import load_config
+from syra.core.speech.speech import speech_loop
 
-import time
+config = load_config()
+use_loop = config.get("syra", {}).get("run_loop", True)
+max_cycles = config.get("syra", {}).get("max_cycles", 0)  # 0 = unlimited
 
-def main_loop(sensors, memory, reasoning, hardware, speech, max_cycles=5):
-    cycle = 0
-    while True:
-        if max_cycles and cycle >= max_cycles:
-            print("[LOOP] Max cycles reached, exiting.")
-            break
+def main_loop():
+    print("[LOOP] Starting SYRA main loop...")
+    cycles = 0
+    try:
+        while True:
+            speech_loop()
+            cycles += 1
+            if max_cycles and cycles >= max_cycles:
+                print("[LOOP] Max cycles reached, exiting.")
+                break
+    except KeyboardInterrupt:
+        print("\n[LOOP] Interrupted by user. Exiting gracefully.")
 
-        perception = sensors.get_input()
-        memory.update(perception)
-
-        plan = reasoning.generate_plan(perception, memory)
-        action = reasoning.select_action(plan)
-
-        hardware.execute(action)
-        speech.respond(action)
-        memory.log_interaction(perception, plan, action)
-
-        hardware.monitor_system()
-        cycle += 1
-        time.sleep(1)  # Add delay to slow it down
+if __name__ == "__main__":
+    main_loop()
