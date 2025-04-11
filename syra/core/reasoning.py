@@ -18,6 +18,6 @@ def analyze(prompt):
         print(f"[ERROR] Reasoning failed: {e}")
         return "An error occurred during reasoning."
 
-# Optional: test run
+# Optional test
 if __name__ == "__main__":
     print(analyze("What is the mission objective?"))
