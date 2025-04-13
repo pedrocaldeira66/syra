@@ -5,5 +5,15 @@
   "motor_driver": "pwm_hat",
   "battery_sensor": "INA219",
   "speaker": "usb_audio",
-  "mic": "usb_mic"
+  "mic": "usb_mic",
+  "pca9685_address": "0x40",
+  "servos": {
+    "LEFT_EYE_H": 0,
+    "LEFT_EYE_V": 1,
+    "RIGHT_EYE_H": 2,
+    "RIGHT_EYE_V": 3,
+    "MOUTH": 4,
+    "LEFT_UPPER_LID": 5,
+    "RIGHT_UPPER_LID": 6
+  }
 }

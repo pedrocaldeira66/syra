@@ -4,55 +4,56 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-def load_env_config():
-    return {
-        "env": os.getenv("SYRA_ENV", "development"),
-        "use_mock": os.getenv("USE_MOCK", "false").lower() == "true",
-        "speech": {
-            "mode": os.getenv("SPEECH_MODE", "offline"),
-            "stt": os.getenv("STT_ENGINE", "mock"),
-            "tts": os.getenv("TTS_ENGINE", "mock"),
-            "language": os.getenv("LANGUAGE", "en"),
-            "vosk_model_path": os.getenv("VOSK_MODEL_PATH", "models/vosk"),
-            "online_tts": os.getenv("ONLINE_TTS_SERVICE", "none"),
-            "online_stt": os.getenv("ONLINE_STT_SERVICE", "none"),
-        },
-        "vision": {
-            "enabled": os.getenv("VISION_ENABLED", "true").lower() == "true",
-            "camera": os.getenv("CAMERA_SOURCE", "mock"),
-            "frame_width": int(os.getenv("FRAME_WIDTH", 640)),
-            "frame_height": int(os.getenv("FRAME_HEIGHT", 480))
-        },
-        "memory": {
-            "backend": os.getenv("MEMORY_BACKEND", "file"),
-            "path": os.getenv("MEMORY_PATH", "./data/memory.json")
-        },
-        "hardware": {
-            "gpio_enabled": os.getenv("GPIO_ENABLED", "true").lower() == "true",
-            "motor_driver": os.getenv("MOTOR_DRIVER", "mock")
-        },
-        "llm": {
-            "use_llm": os.getenv("USE_LLM", "false").lower() == "true",
-            "mode": os.getenv("LLM_MODE", "offline"),
-            "api_key": os.getenv("OPENAI_API_KEY", ""),
-            "model": os.getenv("LLM_MODEL", "gpt-4")
-        },
-        "logging": {
-            "level": os.getenv("LOG_LEVEL", "debug"),
-            "to_file": os.getenv("LOG_TO_FILE", "false").lower() == "true"
-        }
-    }
+CONFIG_PATH = os.getenv("CONFIG_FILE", "core/config/hardware_config.json")
 
-def load_personality():
-    path = os.path.join("syra", "personality", "personality.json")
-    try:
-        with open(path, "r") as f:
-            return json.load(f)
-    except Exception as e:
-        print(f"[WARN] Failed to load personality config: {e}")
-        return {}
 
 def load_config():
-    config = load_env_config()
-    config["personality"] = load_personality()
+    config = {
+        "hardware": {},
+        "personality": {},
+        "llm": {},
+        "mode": {},
+    }
+
+    # Load hardware config from JSON if available
+    if os.path.exists(CONFIG_PATH):
+        with open(CONFIG_PATH, "r") as f:
+            config["hardware"] = json.load(f)
+
+    # Load personality from .env
+    config["personality"]["tone"] = os.getenv("SYRA_TONE", "warm")
+    config["personality"]["formality"] = os.getenv("SYRA_FORMALITY", "casual")
+    config["personality"]["name"] = os.getenv("SYRA_NAME", "SYRA")
+    config["personality"]["creator_name"] = os.getenv("CREATOR_NAME", "The Creator")
+
+    # Load mode defaults from .env
+    config["mode"]["LLM_MODE"] = os.getenv("LLM_MODE", "offline")
+    config["mode"]["TTS_MODE"] = os.getenv("TTS_MODE", "offline")
+    config["mode"]["STT_MODE"] = os.getenv("STT_MODE", "offline")
+
+    # Load LLM config from .env
+    config["llm"]["model"] = os.getenv("LLM_MODEL")
+    config["llm"]["api_key"] = os.getenv("LLM_API_KEY")
+    config["llm"]["endpoint"] = os.getenv("LLM_API_URL")
+    config["llm"]["provider"] = os.getenv("LLM_PROVIDER")
+
+    # Fallback: load servo values from .env if hardware config is missing or incomplete
+    if "servos" not in config["hardware"]:
+        config["hardware"]["servos"] = {
+            "LEFT_EYE_H": int(os.getenv("LEFT_EYE_H_SERVO", 0)),
+            "LEFT_EYE_V": int(os.getenv("LEFT_EYE_V_SERVO", 1)),
+            "RIGHT_EYE_H": int(os.getenv("RIGHT_EYE_H_SERVO", 2)),
+            "RIGHT_EYE_V": int(os.getenv("RIGHT_EYE_V_SERVO", 3)),
+            "MOUTH": int(os.getenv("MOUTH_SERVO", 4)),
+            "LEFT_UPPER_LID": int(os.getenv("LEFT_UPPER_LID_SERVO", 5)),
+            "RIGHT_UPPER_LID": int(os.getenv("RIGHT_UPPER_LID_SERVO", 6)),
+        }
+
+    # Fallback for PCA9685 address
+    if "pca9685_address" not in config["hardware"]:
+        config["hardware"]["pca9685_address"] = os.getenv("PCA9685_ADDRESS", "0x40")
+
     return config
+
+
+config = load_config()
